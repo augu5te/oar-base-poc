@@ -1,0 +1,10 @@
+[package]
+name = "oar-common"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Shared types and helpers of the OAR base system"
+
+[dependencies]
+oar-proto = { path = "../oar-proto" }

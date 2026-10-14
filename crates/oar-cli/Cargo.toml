@@ -1,0 +1,19 @@
+[package]
+name = "oar-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "OAR base system - user commands (oarsub, oarstat)"
+
+[[bin]]
+name = "oarsub"
+path = "src/oarsub.rs"
+
+[[bin]]
+name = "oarstat"
+path = "src/oarstat.rs"
+
+[dependencies]
+oar-proto = { path = "../oar-proto" }
+oar-common = { path = "../oar-common" }

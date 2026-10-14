@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package oar;
+
+message Empty {}
+
+message Ack {
+  bool ok = 1;
+  string message = 2;
+}
+
+message NodeRef {
+  string id = 1;
+  string address = 2;
+}
+
+// ---- client -> server ------------------------------------------------------
+message NewJobNotification {}
+
+// ---- compute node -> server --------------------------------------------
+message JobFinishedRequest {
+  uint64 job_id = 1;
+  string node_id = 2;
+  int32 exit_code = 3;
+}
+
+// ---- server -> compute node --------------------------------------------
+message StartJobRequest {
+  uint64 job_id = 1;
+  uint32 user_uid = 2;
+  string command = 3;
+  // All nodes of the job; the first one is the head node (the receiver).
+  repeated NodeRef nodes = 4;
+  uint32 walltime_secs = 5;
+}
+
+message PingResponse {
+  string node_id = 1;
+  uint32 running_jobs = 2;
+}
+
+// Exposed by the (single) server.
+service ServerService {
+  rpc NotifyNewJob(NewJobNotification) returns (Ack);
+  rpc JobFinished(JobFinishedRequest) returns (Ack);
+}
+
+// Exposed by every compute node.
+service NodeService {
+  rpc StartJob(StartJobRequest) returns (Ack);
+  rpc Ping(Empty) returns (PingResponse);
+}
