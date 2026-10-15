@@ -1,0 +1,9 @@
+# Cargo cache (in-workspace CARGO_HOME)
+/.cargo/
+
+# Build artifacts
+**/target/
+
+# Environment
+.env
+.envrc
