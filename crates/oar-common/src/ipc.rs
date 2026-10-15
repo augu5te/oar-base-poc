@@ -15,7 +15,9 @@ pub const SOCKET_ENV: &str = "OAR_CLIENT_SOCKET";
 pub const DEFAULT_SOCKET: &str = "/run/oar/client.sock";
 
 pub fn default_socket_path() -> PathBuf {
-    std::env::var_os(SOCKET_ENV).map(PathBuf::from).unwrap_or_else(|| DEFAULT_SOCKET.into())
+    std::env::var_os(SOCKET_ENV)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| DEFAULT_SOCKET.into())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,8 +25,18 @@ pub fn default_socket_path() -> PathBuf {
 pub enum IpcRequest {
     /// The submitter's identity is NOT part of the message: the daemon takes it
     /// from the socket credentials.
-    Submit { command: String, nodes: u32, walltime_secs: u32 },
-    Status { job_id: JobId },
+    Submit {
+        command: String,
+        nodes: u32,
+        walltime_secs: u32,
+    },
+    Status {
+        job_id: JobId,
+    },
+    /// Lists the jobs known to the client daemon / the server.
+    List {
+        state: Option<JobState>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,9 +50,19 @@ pub struct JobSummary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum IpcResponse {
-    Submitted { job_id: JobId, warning: Option<String> },
-    Status { job: JobSummary },
-    Error { message: String },
+    Submitted {
+        job_id: JobId,
+        warning: Option<String>,
+    },
+    Status {
+        job: JobSummary,
+    },
+    Jobs {
+        jobs: Vec<JobSummary>,
+    },
+    Error {
+        message: String,
+    },
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -99,24 +121,60 @@ mod tests {
 
     #[test]
     fn requests_roundtrip_with_stable_wire_format() {
-        let r = IpcRequest::Submit { command: "ls".into(), nodes: 2, walltime_secs: 60 };
+        let r = IpcRequest::Submit {
+            command: "ls".into(),
+            nodes: 2,
+            walltime_secs: 60,
+        };
         let json = serde_json::to_string(&r).unwrap();
-        assert_eq!(json, r#"{"type":"submit","command":"ls","nodes":2,"walltime_secs":60}"#);
+        assert_eq!(
+            json,
+            r#"{"type":"submit","command":"ls","nodes":2,"walltime_secs":60}"#
+        );
         assert_eq!(serde_json::from_str::<IpcRequest>(&json).unwrap(), r);
     }
 
     #[test]
+    fn list_request_has_a_stable_wire_format() {
+        let r = IpcRequest::List { state: None };
+        assert_eq!(
+            serde_json::to_string(&r).unwrap(),
+            r#"{"type":"list","state":null}"#
+        );
+        let r = IpcRequest::List {
+            state: Some(JobState::Running),
+        };
+        assert_eq!(
+            serde_json::to_string(&r).unwrap(),
+            r#"{"type":"list","state":"running"}"#
+        );
+        assert_eq!(
+            serde_json::from_str::<IpcRequest>(r#"{"type":"list","state":null}"#).unwrap(),
+            IpcRequest::List { state: None }
+        );
+    }
+
+    #[test]
     fn responses_roundtrip() {
+        let summary = JobSummary {
+            job_id: 1,
+            state: JobState::Running,
+            nodes: vec!["n1".into()],
+            exit_code: None,
+        };
         let responses = [
-            IpcResponse::Submitted { job_id: 3, warning: Some("w".into()) },
-            IpcResponse::Error { message: "no".into() },
+            IpcResponse::Submitted {
+                job_id: 3,
+                warning: Some("w".into()),
+            },
+            IpcResponse::Error {
+                message: "no".into(),
+            },
             IpcResponse::Status {
-                job: JobSummary {
-                    job_id: 1,
-                    state: JobState::Running,
-                    nodes: vec!["n1".into()],
-                    exit_code: None,
-                },
+                job: summary.clone(),
+            },
+            IpcResponse::Jobs {
+                jobs: vec![summary],
             },
         ];
         for r in responses {
@@ -133,12 +191,21 @@ mod tests {
     #[tokio::test]
     async fn bounded_line_reader() {
         let mut ok = BufReader::new(&b"hello\nworld\n"[..]);
-        assert_eq!(read_line_bounded(&mut ok).await.unwrap().as_deref(), Some("hello"));
-        assert_eq!(read_line_bounded(&mut ok).await.unwrap().as_deref(), Some("world"));
+        assert_eq!(
+            read_line_bounded(&mut ok).await.unwrap().as_deref(),
+            Some("hello")
+        );
+        assert_eq!(
+            read_line_bounded(&mut ok).await.unwrap().as_deref(),
+            Some("world")
+        );
         assert_eq!(read_line_bounded(&mut ok).await.unwrap(), None);
 
         let big = vec![b'a'; MAX_MESSAGE_BYTES + 10];
         let mut reader = BufReader::new(&big[..]);
-        assert!(matches!(read_line_bounded(&mut reader).await, Err(IpcError::TooLarge)));
+        assert!(matches!(
+            read_line_bounded(&mut reader).await,
+            Err(IpcError::TooLarge)
+        ));
     }
 }

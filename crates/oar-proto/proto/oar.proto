@@ -2,6 +2,14 @@ syntax = "proto3";
 
 package oar;
 
+// The whole wire protocol of the OAR base system: messages + 4 services.
+//
+//   * SchedulerService    : client daemon  -> server   (new job notification)
+//   * NodeCallbackService : compute node   -> server   (registration, heartbeat,
+//                                                        job completion)
+//   * ComputeNodeService  : server         -> node      (start job, liveness)
+//   * AdminService        : operator / CLI -> server    (cluster introspection)
+
 message Empty {}
 
 message Ack {
@@ -15,16 +23,48 @@ message NodeRef {
 }
 
 // ---- client -> server ------------------------------------------------------
+
 message NewJobNotification {}
 
-// ---- compute node -> server --------------------------------------------
+// The job description as understood by the server. The client daemon stores the
+// submission in its (placeholder) database and forwards this to the server,
+// which allocates the definitive job id.
+message JobSpec {
+  uint32 user_uid = 1;
+  string command = 2;
+  uint32 nodes = 3;
+  uint32 walltime_secs = 4;
+}
+
+message NotifyNewJobRequest {
+  JobSpec job = 1;
+}
+
+message NotifyNewJobResponse {
+  uint64 job_id = 1;
+}
+
+// ---- compute node -> server ------------------------------------------------
+
+message RegisterNodeRequest {
+  string node_id = 1;
+  // `host:port` of the node's gRPC endpoint.
+  string address = 2;
+}
+
+message HeartbeatRequest {
+  string node_id = 1;
+  uint32 running_jobs = 2;
+}
+
 message JobFinishedRequest {
   uint64 job_id = 1;
   string node_id = 2;
   int32 exit_code = 3;
 }
 
-// ---- server -> compute node --------------------------------------------
+// ---- server -> compute node ------------------------------------------------
+
 message StartJobRequest {
   uint64 job_id = 1;
   uint32 user_uid = 2;
@@ -39,14 +79,60 @@ message PingResponse {
   uint32 running_jobs = 2;
 }
 
-// Exposed by the (single) server.
-service ServerService {
-  rpc NotifyNewJob(NewJobNotification) returns (Ack);
+// ---- admin / introspection -------------------------------------------------
+
+message JobStatus {
+  uint64 job_id = 1;
+  string state = 2;
+  repeated NodeRef nodes = 3;
+  optional int32 exit_code = 4;
+  string message = 5;
+}
+
+message GetJobRequest {
+  uint64 job_id = 1;
+}
+
+message ListJobsRequest {
+  // Optional state filter, using the `JobState` snake_case representation.
+  optional string state = 1;
+}
+
+message ListJobsResponse {
+  repeated JobStatus jobs = 1;
+}
+
+message ClusterStatusResponse {
+  uint32 nodes_registered = 1;
+  uint32 nodes_alive = 2;
+  uint32 jobs_waiting = 3;
+  uint32 jobs_active = 4;
+  uint32 jobs_finished = 5;
+}
+
+// ---- services --------------------------------------------------------------
+
+// Exposed by the (single) server, used by the client daemons.
+service SchedulerService {
+  rpc NotifyNewJob(NotifyNewJobRequest) returns (NotifyNewJobResponse);
+}
+
+// Exposed by the (single) server, used by the compute nodes.
+service NodeCallbackService {
+  rpc RegisterNode(RegisterNodeRequest) returns (Ack);
+  rpc Heartbeat(HeartbeatRequest) returns (Ack);
   rpc JobFinished(JobFinishedRequest) returns (Ack);
 }
 
-// Exposed by every compute node.
-service NodeService {
+// Exposed by every compute node, used by the server.
+service ComputeNodeService {
   rpc StartJob(StartJobRequest) returns (Ack);
   rpc Ping(Empty) returns (PingResponse);
+}
+
+// Exposed by the (single) server, used by operators / the CLI.
+service AdminService {
+  rpc GetJob(GetJobRequest) returns (JobStatus);
+  rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
+  rpc ClusterStatus(Empty) returns (ClusterStatusResponse);
 }

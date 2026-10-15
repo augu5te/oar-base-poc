@@ -14,3 +14,39 @@ version = "0.1.0"
 edition = "2024"
 license = "LGPL-3.0-or-later"
 rust-version = "1.95"
+
+[workspace.dependencies]
+oar-proto = { path = "crates/oar-proto" }
+oar-common = { path = "crates/oar-common" }
+oar-client = { path = "crates/oar-client" }
+oar-node = { path = "crates/oar-node" }
+oar-server = { path = "crates/oar-server" }
+
+async-trait = "0.1"
+clap = { version = "4", features = ["derive"] }
+config = { version = "0.15", default-features = false }
+dotenvy = "0.15"
+prost = "0.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+thiserror = "2"
+tokio = { version = "1", features = [
+    "fs",
+    "io-util",
+    "macros",
+    "net",
+    "rt-multi-thread",
+    "signal",
+    "sync",
+    "time",
+] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tonic = "0.14"
+tonic-prost = "0.14"
+tonic-prost-build = "0.14"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+lto = "thin"

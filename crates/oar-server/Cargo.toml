@@ -1,0 +1,30 @@
+[package]
+name = "oar-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "OAR base system - the unique server daemon (automaton + engine)"
+
+[[bin]]
+name = "oar-server"
+path = "src/main.rs"
+
+[dependencies]
+oar-proto = { workspace = true }
+oar-common = { workspace = true }
+
+async-trait = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+oar-client = { workspace = true }
+oar-node = { workspace = true }
+
+tempfile = { workspace = true }

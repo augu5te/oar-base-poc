@@ -6,6 +6,10 @@ license.workspace = true
 rust-version.workspace = true
 description = "OAR base system - user commands (oarsub, oarstat)"
 
+[lib]
+name = "oar_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "oarsub"
 path = "src/oarsub.rs"
@@ -15,5 +19,16 @@ name = "oarstat"
 path = "src/oarstat.rs"
 
 [dependencies]
-oar-proto = { path = "../oar-proto" }
-oar-common = { path = "../oar-common" }
+oar-proto = { workspace = true }
+oar-common = { workspace = true }
+
+clap = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+oar-client = { workspace = true }
+
+async-trait = { workspace = true }
+tempfile = { workspace = true }
